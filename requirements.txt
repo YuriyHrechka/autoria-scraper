@@ -1,0 +1,15 @@
+annotated-types==0.7.0
+APScheduler==3.11.1
+asyncpg==0.31.0
+greenlet==3.3.0
+loguru==0.7.3
+playwright==1.57.0
+pydantic==2.12.5
+pydantic-settings==2.12.0
+pydantic_core==2.41.5
+pyee==13.0.0
+python-dotenv==1.2.1
+SQLAlchemy==2.0.45
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+tzlocal==5.3.1

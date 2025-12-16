@@ -1,3 +1,6 @@
+from typing import AsyncGenerator
+from contextlib import asynccontextmanager
+
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
@@ -20,3 +23,17 @@ class Base(DeclarativeBase):
     registered and mapped to the database tables.
     """
     pass
+
+@asynccontextmanager
+async def async_session() -> AsyncGenerator[AsyncSession, None]:
+    """Provides an asynchronous database session context manager.
+
+    This function handles the lifecycle of the database session, ensuring
+    it is properly created before use and closed after the block exits.
+    It is designed to be used with the `async with` statement.
+
+    Yields:
+        AsyncSession: An active database session.
+    """
+    async with AsyncSessionLocal() as session:
+        yield session

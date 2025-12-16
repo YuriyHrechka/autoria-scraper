@@ -12,7 +12,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from core.config import settings
 from database.models import Car
-
+from zoneinfo import ZoneInfo
 
 class AutoRiaScraper:
     """Main Scraper Service for AutoRia.
@@ -26,17 +26,18 @@ class AutoRiaScraper:
         context (Optional[BrowserContext]): The Playwright browser context.
         semaphore (asyncio.Semaphore): Concurrency limiter for scraping tasks.
     """
-    def __init__(self, db: AsyncSession, semaphore_limit: int = 3):
-            """Initializes the scraper with a database session and concurrency controls.
 
-            Args:
-                db (AsyncSession): An active asynchronous SQLAlchemy session.
-                semaphore_limit (int, optional): The maximum number of concurrent
-                    scraping tasks (browser tabs) allowed. Defaults to 3.
-            """
-            self.db = db
-            self.context: Optional[BrowserContext] = None
-            self.semaphore = asyncio.Semaphore(semaphore_limit)
+    def __init__(self, db: AsyncSession, semaphore_limit: int = 3):
+        """Initializes the scraper with a database session and concurrency controls.
+
+        Args:
+            db (AsyncSession): An active asynchronous SQLAlchemy session.
+            semaphore_limit (int, optional): The maximum number of concurrent
+                scraping tasks (browser tabs) allowed. Defaults to 3.
+        """
+        self.db = db
+        self.context: Optional[BrowserContext] = None
+        self.semaphore = asyncio.Semaphore(semaphore_limit)
 
     async def run(self):
         """Executes the main scraping workflow.
@@ -79,7 +80,7 @@ class AutoRiaScraper:
             list[str]: A list of collected car URLs (used internally).
         """
         current_url = settings.START_URL
-
+       
         while True:
             logger.info(f"Processing catalog page: {current_url}")
             try:
@@ -90,7 +91,15 @@ class AutoRiaScraper:
                 break
 
             links_locators = await page.locator("a.m-link-ticket").all()
-            car_links = [await link.get_attribute("href") for link in links_locators]
+
+            car_links = []
+            for link in links_locators:
+                href = await link.get_attribute("href")
+                # Ignore new cars
+                if href and "/newauto/" not in href:
+                    car_links.append(href)
+                elif href:
+                    logger.debug(f"Skipping new auto ad: {href}")
 
             logger.info(f"Found {len(car_links)} cars on the current page.")
 
@@ -150,7 +159,9 @@ class AutoRiaScraper:
                     auto_id = match.group(1)
 
             if not auto_id:
-                logger.warning(f"WARNING: Could not determine auto_id for {link}. Skipping.")
+                logger.warning(
+                    f"WARNING: Could not determine auto_id for {link}. Skipping."
+                )
                 return
 
             title = await page.locator("#basicInfoTitle").first.text_content()
@@ -185,7 +196,7 @@ class AutoRiaScraper:
             image_url = await page.locator(
                 "div.carousel__viewport img"
             ).first.get_attribute("src")
-            
+
             photo_count_text = await page.locator(
                 '#photoSlider .carousel__liveregion[aria-live="polite"]'
             ).text_content()
@@ -204,7 +215,7 @@ class AutoRiaScraper:
                 "images_count": images_count,
                 "car_number": car_number.strip() if car_number else None,
                 "car_vin": car_vin.strip() if car_vin else None,
-                "datetime_found": datetime.now(),
+                "datetime_found": datetime.now(ZoneInfo("Europe/Kyiv")),
             }
 
             await self._save_to_db(car_data)
@@ -233,7 +244,10 @@ class AutoRiaScraper:
 
         logger.debug("Attempting to click 'Show Phone' button")
         try:
-            await show_phone_button.click(timeout=10000)
+            if await show_phone_button.count() > 0:
+                await show_phone_button.first.click(timeout=5000)
+            else:
+                return None
         except Exception as e:
             logger.warning(f"Could not click 'Show Phone' button: {e}")
             return None

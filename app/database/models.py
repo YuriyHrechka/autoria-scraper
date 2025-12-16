@@ -2,7 +2,7 @@ from datetime import datetime
 from sqlalchemy import String, Integer, BigInteger, DateTime, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.database.session import Base
+from database.session import Base
 
 
 class Car(Base):
